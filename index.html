@@ -93,6 +93,7 @@ th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--border);
 th{ background:var(--surface-alt); color:var(--text-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; user-select:none; }
 th:hover{color:var(--text);}
 th .arrow{opacity:.4; margin-left:4px; font-size:10px;}
+tfoot .total-row td{background:var(--primary-soft); color:var(--text); font-weight:700; border-top:2px solid var(--primary); border-bottom:none;}
 tbody tr:last-child td{border-bottom:none;}
 tbody tr:hover{background:var(--surface-alt);}
 td.eg{font-family:"IBM Plex Mono",monospace; color:var(--accent); font-weight:500;}
@@ -273,7 +274,7 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
 
   <section id="faturamento">
     <div class="section-head"><h2>Faturamento — Previsto x Realizado</h2><span class="hint">apenas contratos de Supervisão/Fiscalização, por mês</span></div>
-    <div class="empty-banner">⏳ <span><b>Aguardando primeiro lançamento.</b> A aba "Faturamento Mensal" da mesma planilha ainda está vazia. Quando o mês for lançado, os cards e a tabela abaixo passam a mostrar Previsto, Realizado e a variação, no mesmo formato do painel usado hoje no Power BI.</span></div>
+    <div class="empty-banner" id="fatBanner">⏳ <span><b>Realizado ainda não lançado.</b> O Previsto já vem da planilha CONTRATOS - ENGEPLUS para os contratos com previsão de faturamento cadastrada. O Realizado é lançado manualmente na aba "Faturamento Mensal" conforme as notas fiscais são emitidas.</span></div>
     <div class="kpi-grid" id="fatKpiGrid" style="margin-bottom:16px;"></div>
     <div class="table-card">
       <div class="table-scroll">
@@ -282,6 +283,7 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
             <tr><th>EG</th><th>Contrato</th><th>Previsto (R$)</th><th>Realizado (R$)</th><th>Variação</th></tr>
           </thead>
           <tbody id="tblFatBody"></tbody>
+          <tfoot id="tblFatFoot"></tfoot>
         </table>
       </div>
     </div>
@@ -549,6 +551,14 @@ function renderFaturamento(){
       <td class="mono">${varPct!==null ? fmtPct(varPct) : '—'}</td>
     </tr>`;
   }).join('');
+
+  const foot = document.getElementById('tblFatFoot');
+  foot.innerHTML = `<tr class="total-row">
+    <td colspan="2">Total Engeplus (Supervisão/Fiscalização)</td>
+    <td class="mono">${hasAny ? fmtMoney(totalPrevisto) : '—'}</td>
+    <td class="mono">${hasAny ? fmtMoney(totalRealizado) : '—'}</td>
+    <td class="mono">${variacao!==null ? fmtPct(variacao) : '—'}</td>
+  </tr>`;
 }
 
 /* ---------- UF panel ---------- */
