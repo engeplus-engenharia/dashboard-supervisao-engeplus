@@ -194,6 +194,7 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
   <a href="#tabela">Contratos</a>
   <a href="#indicadores">Indicadores PR.02</a>
   <a href="#faturamento">Faturamento</a>
+  <a href="#orcamento">Orçamento 2027</a>
   <a href="#linha-do-tempo">Linha do Tempo</a>
 </div></nav>
 
@@ -286,6 +287,184 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
       </div>
     </div>
   </section>
+
+  <style>
+#orcamento .orc-grid{display:grid; grid-template-columns:minmax(260px,330px) 1fr; gap:16px; align-items:start;}
+@media(max-width:900px){#orcamento .orc-grid{grid-template-columns:1fr;}}
+#orcamento .panel{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px;}
+#orcamento .panel h3{font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin:0 0 10px; font-weight:600;}
+#orcamento .ctl{margin:0 0 12px;}
+#orcamento .ctl .row{display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; gap:8px;}
+#orcamento .ctl .row b{color:var(--accent); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap;}
+#orcamento input[type=range]{width:100%; accent-color:var(--accent);}
+#orcamento .scen{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;}
+#orcamento .btn{background:var(--surface-raised); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 11px; font:inherit; font-size:12.5px; cursor:pointer;}
+#orcamento .btn:hover{border-color:var(--accent);}
+#orcamento .btn.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+#orcamento .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:14px;}
+#orcamento .card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px;}
+#orcamento .card .n{font-size:20px; font-weight:600; font-variant-numeric:tabular-nums;}
+#orcamento .card .l{font-size:12px; color:var(--text-muted); margin-top:2px;}
+#orcamento .card .d{font-size:11.5px; margin-top:4px; color:var(--text-muted);}
+#orcamento .pos{color:var(--ok);} #orcamento .neg{color:var(--bad);}
+#orcamento table{width:100%; border-collapse:collapse; font-size:12.5px;}
+#orcamento th,#orcamento td{padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums;}
+#orcamento th:first-child,#orcamento td:first-child{text-align:left; position:sticky; left:0; background:var(--surface);}
+#orcamento th{color:var(--text-muted); font-weight:500; font-size:11.5px;}
+#orcamento tr.sub td{font-weight:600; background:var(--primary-soft);}
+#orcamento tr.sub td:first-child{background:var(--primary-soft);}
+#orcamento .scroll{overflow-x:auto;}
+#orcamento .mini{width:110px; background:var(--surface-alt); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px; font:inherit; text-align:right;}
+#orcamento .mini.ovr{border-color:var(--warn); background:var(--warn-soft);}
+#orcamento .note{font-size:12px; color:var(--text-muted); margin-top:8px; line-height:1.5;}
+#orcamento .tag{display:inline-block; font-size:10.5px; padding:1px 6px; border-radius:6px; background:var(--primary-soft); color:var(--primary); margin-right:6px;}
+#orcamento svg text{fill:var(--text-muted); font-size:10px;}
+</style>
+<section id="orcamento">
+  <div class="section-head"><h2>Orçamento 2027</h2><span class="hint">simulador interativo · base: DRE e contratos do ERP · mexa nos controles e veja o resultado na hora</span></div>
+  <div class="scen" id="orcScen"></div>
+  <div class="cards" id="orcCards"></div>
+  <div class="orc-grid">
+    <div class="panel" id="orcCtl"><h3>Premissas</h3></div>
+    <div>
+      <div class="panel" style="margin-bottom:14px"><h3>Receita bruta e EBITDA por mês</h3><div id="orcChart"></div><div class="note" id="orcLegend"></div></div>
+      <div class="panel"><h3>DRE projetada 2027 (R$ mil)</h3><div class="scroll"><table id="orcDre"></table></div></div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:14px">
+    <h3>Metas de faturamento por contrato</h3>
+    <div class="note" style="margin:0 0 10px">Receita 2027 de cada contrato = ritmo mensal de 2026 × reajuste × (meses cobertos pelo saldo a faturar + probabilidade de renovação/aditivo nos demais meses). Digite uma <b>meta mensal</b> para sobrescrever um contrato (fica destacada em amarelo).</div>
+    <div class="scroll"><table id="orcCt"></table></div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap"><button class="btn" id="orcCsv">Exportar CSV</button><button class="btn" id="orcClr">Limpar metas manuais</button></div>
+    <div class="note" id="orcFonte"></div>
+  </div>
+</section>
+<script>
+(function(){
+const OB = {"anual": {"2021": [5621741, 3034368, 1927192, 250313], "2022": [20708216, 10151370, 8563238, -538090], "2023": [39662989, 13654905, 17756062, 3403689], "2024": [48331747, 17242351, 24250178, 1453386], "2025": [51586831, 19670396, 21715482, 4120271], "2026ytd": [47761384, 13860011, 24860071, 3539362]}, "m2025": {"rec": [3383875, 3843453, 3033860, 4972909, 4639261, 5832871, 4440509, 4387546, 4442271, 3877739, 3037140, 5695397], "ebitda": [-1051617, -4409, -384437, 680456, 815123, 1400709, 394990, 439503, 716685, 367273, -285654, 1031651]}, "m2026": {"rec": [3839184, 3020607, 6557048, 5023905, 6095268, 4800283, 5238133, 4983102, 5865339, 2338514], "cust": [1618697, 1267810, 1599132, 1494743, 1577813, 1570651, 1417419, 1218256, 1361332, 734158], "fix": [1781218, 2235574, 2896783, 2375108, 3021989, 2915008, 2549841, 3046930, 3199417, 838203], "ded": [483437, 401898, 771611, 670139, 654327, 564859, 507788, 654002, 606992, 186887], "ebitda": [-44169, -884675, 1289522, 483916, 841139, -250235, 763085, 63915, 697598, 579266]}, "fin26": -1726077, "inv26": 1216160, "parc26": 812198, "dist26": 307045, "fonte": "ERP Engeplus · Resultados financeiros · carga de 08/10/2026 16:04 (visão caixa)", "contratos": [{"c": "242", "n": "CODEVASF - Apoio Ações de Desenv. Regional", "t": "S", "a": 1, "rec": 8225394, "eb": 1243684, "ct": 13913752, "sd": -31305390, "m": 9}, {"c": "273", "n": "DNIT-AP-Supervisão BR156-AP", "t": "S", "a": 1, "rec": 7123410, "eb": 3495202, "ct": 14820901, "sd": 5819548, "m": 9}, {"c": "283", "n": "EMBASA - Assessoramento SAA e SES - RMS", "t": "S", "a": 1, "rec": 7031261, "eb": 1031440, "ct": 50663982, "sd": 43608758, "m": 9}, {"c": "278", "n": "COPASA - Fiscalização SAA-SES Lote 02", "t": "S", "a": 1, "rec": 4503621, "eb": -97737, "ct": 7563013, "sd": -519200, "m": 9}, {"c": "279", "n": "COPASA - Fiscalização SAA-SES Lote 05", "t": "S", "a": 1, "rec": 2623340, "eb": 153425, "ct": 4462154, "sd": 662866, "m": 7}, {"c": "284", "n": "EMBASA - Acompanhamento e Fiscalização SES-EXN", "t": "S", "a": 1, "rec": 2324731, "eb": -174340, "ct": 0, "sd": 0, "m": 7}, {"c": "268", "n": "CODEVASF - Fiscalização Pavimentação AP", "t": "S", "a": 1, "rec": 1591117, "eb": 364543, "ct": 2526439, "sd": -1058191, "m": 7}, {"c": "269", "n": "DNIT - Supervisão Anápolis-Uruaçu", "t": "S", "a": 1, "rec": 1588795, "eb": -761175, "ct": 18090398, "sd": 13884732, "m": 7}, {"c": "250", "n": "AGEVAP-RJ - Fiscalização Guandu", "t": "S", "a": 1, "rec": 1190069, "eb": 329004, "ct": 1677111, "sd": -4940144, "m": 8}, {"c": "277", "n": "DNIT-MA - Supervisão Operações Rodoviárias", "t": "S", "a": 1, "rec": 1023531, "eb": 311548, "ct": 0, "sd": 0, "m": 7}, {"c": "263", "n": "SANEPAR - Fiscalização", "t": "S", "a": 0, "rec": 888629, "eb": -34858, "ct": 7406794, "sd": -357198, "m": 7}, {"c": "276", "n": "DNIT-AP - Supervisão Operações Rodoviárias", "t": "S", "a": 1, "rec": 843205, "eb": 300191, "ct": 7931342, "sd": 6998505, "m": 7}, {"c": "280", "n": "DMAE - Assessoria/Elaboração", "t": "E", "a": 1, "rec": 840846, "eb": 345070, "ct": 1960214, "sd": 448769, "m": 5}, {"c": "288", "n": "CODEVASF - Apoio técnico qualificação viária", "t": "S", "a": 1, "rec": 797803, "eb": -193887, "ct": 3277801, "sd": 2479999, "m": 3}, {"c": "253", "n": "CODEVASF - Apoio Fisc. SAA Sertão Alagoano", "t": "S", "a": 1, "rec": 730186, "eb": -83285, "ct": 6508134, "sd": -810953, "m": 7}, {"c": "274", "n": "DNIT-SC - Elaboração", "t": "E", "a": 1, "rec": 692565, "eb": 102128, "ct": 6237324, "sd": 5087197, "m": 4}, {"c": "256", "n": "SOPS-RS - EIA/RIMA", "t": "E", "a": 1, "rec": 578716, "eb": 334344, "ct": 849902, "sd": 271186, "m": 7}, {"c": "248", "n": "DNIT-BSB - Gerenciamento", "t": "S", "a": 0, "rec": 539586, "eb": 427497, "ct": 9743943, "sd": 1102521, "m": 1}, {"c": "236", "n": "CAGECE - Fiscaliz. Projeto Juazeiro do Norte", "t": "S", "a": 1, "rec": 536931, "eb": 251393, "ct": 2040000, "sd": -133216, "m": 9}, {"c": "281", "n": "CODEVASF - Supervisão rodovias MG", "t": "S", "a": 1, "rec": 522959, "eb": -108534, "ct": 4736081, "sd": 4213123, "m": 5}, {"c": "270", "n": "CESAN - Fiscalização", "t": "S", "a": 0, "rec": 459396, "eb": -251273, "ct": 4163610, "sd": 883577, "m": 6}, {"c": "287", "n": "Dique de Camboriú", "t": "E", "a": 0, "rec": 374000, "eb": 242175, "ct": 374000, "sd": 0, "m": 2}, {"c": "266", "n": "CODEVASF-MG - Desenv. Regional e Territorial", "t": "S", "a": 1, "rec": 362530, "eb": 160888, "ct": 1383226, "sd": 538271, "m": 8}, {"c": "233", "n": "COPASA - Apoio Técnico UGP/KFW", "t": "S", "a": 1, "rec": 358345, "eb": 95793, "ct": 3915564, "sd": -581209, "m": 8}, {"c": "261", "n": "Contagem-MG - Gerenciamento", "t": "S", "a": 0, "rec": 308161, "eb": -147789, "ct": 7716892, "sd": 2491335, "m": 2}, {"c": "232", "n": "EMBASA-RMS - Projetos", "t": "E", "a": 1, "rec": 290364, "eb": -5495, "ct": 3446413, "sd": 386598, "m": 7}, {"c": "275", "n": "CODEVASF-AP - Elaboração", "t": "E", "a": 1, "rec": 240965, "eb": 91555, "ct": 685596, "sd": 227505, "m": 3}, {"c": "239", "n": "COMPESA - Projetos", "t": "E", "a": 1, "rec": 206266, "eb": 96591, "ct": 1911000, "sd": 703171, "m": 1}, {"c": "235", "n": "Aeroporto Caruaru", "t": "E", "a": 1, "rec": 193881, "eb": 100543, "ct": 1182056, "sd": 219997, "m": 2}, {"c": "240", "n": "COMPESA - Projetos", "t": "E", "a": 1, "rec": 189780, "eb": 76448, "ct": 1197132, "sd": 604645, "m": 5}, {"c": "262", "n": "SANEPAR - Fiscalização", "t": "S", "a": 0, "rec": 99077, "eb": -98444, "ct": 6167194, "sd": 1688081, "m": 2}, {"c": "285", "n": "EMBASA - Projeto Básico", "t": "E", "a": 1, "rec": 71337, "eb": -1827, "ct": 976114, "sd": 904778, "m": 3}, {"c": "257", "n": "DMAE-POA - Projetos", "t": "E", "a": 1, "rec": 59664, "eb": -24450, "ct": 5383164, "sd": 4123327, "m": 3}, {"c": "241", "n": "COMPESA - Projetos", "t": "E", "a": 1, "rec": 54157, "eb": -12348, "ct": 534228, "sd": 76731, "m": 2}, {"c": "265", "n": "INEMA-BA - PRH", "t": "E", "a": 1, "rec": 39691, "eb": -9401, "ct": 1600374, "sd": 547600, "m": 2}]};
+const MN=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const DEF={reaj:5, renS:85, renE:70, novos:6000000, novIni:3, custo:30, ded:11.5, fixInfl:5, fixExtra:0, fin:-190000, dist:35000, inv:100000, parc:80000, metaMg:12};
+const SC={
+  cons:Object.assign({},DEF,{reaj:3, renS:70, renE:50, novos:2000000, novIni:5, custo:32, fixInfl:7}),
+  base:Object.assign({},DEF),
+  otim:Object.assign({},DEF,{reaj:6, renS:95, renE:85, novos:12000000, novIni:2, custo:28, fixInfl:4})
+};
+const CTL=[
+ ['reaj','Reajuste anual dos contratos',0,12,0.5,v=>v.toFixed(1)+'%'],
+ ['renS','Renovação/aditivo · Supervisão',0,100,5,v=>v+'%'],
+ ['renE','Renovação/aditivo · Estudos e Projetos',0,100,5,v=>v+'%'],
+ ['novos','Meta de novos contratos (R$ no ano)',0,30000000,500000,v=>'R$ '+(v/1e6).toFixed(1)+' mi'],
+ ['novIni','Mês de início dos novos',1,12,1,v=>MN[v-1]],
+ ['ded','Deduções (impostos) % da receita',8,15,0.5,v=>v.toFixed(1)+'%'],
+ ['custo','Custos diretos % da receita',20,40,0.5,v=>v.toFixed(1)+'%'],
+ ['fixInfl','Despesas fixas: reajuste sobre 2026',0,15,0.5,v=>v.toFixed(1)+'%'],
+ ['fixExtra','Despesas fixas: expansão (R$/mês)',0,500000,10000,v=>'R$ '+Math.round(v/1000)+' mil'],
+ ['fin','Resultado financeiro (R$/mês)',-400000,100000,10000,v=>'R$ '+Math.round(v/1000)+' mil'],
+ ['inv','Investimentos (R$/mês)',0,400000,10000,v=>'R$ '+Math.round(v/1000)+' mil'],
+ ['parc','Parcelamentos (R$/mês)',0,200000,10000,v=>'R$ '+Math.round(v/1000)+' mil'],
+ ['dist','Distribuição de lucros (R$/mês)',0,300000,5000,v=>'R$ '+Math.round(v/1000)+' mil'],
+ ['metaMg','Meta de margem EBITDA',0,25,0.5,v=>v.toFixed(1)+'%']
+];
+let P=Object.assign({},DEF), OVR={}, SCN='base';
+try{const s=JSON.parse(localStorage.getItem('orc2027')||'null'); if(s){P=Object.assign(P,s.P||{}); OVR=s.OVR||{}; SCN=s.SCN||'base';}}catch(e){}
+function save(){try{localStorage.setItem('orc2027',JSON.stringify({P,OVR,SCN}));}catch(e){}}
+const R$=v=>(v<0?'-':'')+'R$ '+Math.abs(Math.round(v)).toLocaleString('pt-BR');
+const mi=v=>(v<0?'-':'')+'R$ '+(Math.abs(v)/1e6).toFixed(1).replace('.',',')+' mi';
+const k=v=>Math.round(v/1000).toLocaleString('pt-BR');
+const pc=v=>(v*100).toFixed(1).replace('.',',')+'%';
+const fixBase=(OB.m2026.fix.slice(0,9).reduce((a,b)=>a+b,0))/9;
+
+function calc(){
+  const g=1+P.reaj/100, rows=[], tot=Array(12).fill(0), novos=Array(12).fill(0);
+  OB.contratos.filter(c=>c.a).forEach(c=>{
+    const run=(c.t==='S')?c.rec/Math.max(1,c.m):c.rec/9.3, p=(c.t==='S'?P.renS:P.renE)/100;
+    const cov=(c.sd>0&&run>0)?Math.min(12,c.sd/(run*g)):0, fl=Math.floor(cov), f=cov-fl, arr=[];
+    for(let m=0;m<12;m++){ let w; if(cov>=12) w=1; else if(m<fl) w=1; else if(m===fl) w=f+(1-f)*p; else w=p; arr.push(run*g*w); }
+    const ov=OVR[c.c]; const fin=(ov!=null&&ov!=='')?Array(12).fill(+ov):arr;
+    const sum=fin.reduce((a,b)=>a+b,0); fin.forEach((v,i)=>tot[i]+=v);
+    rows.push({c,run,cov,sum,ov:(ov!=null&&ov!==''),p});
+  });
+  const st=Math.max(0,P.novIni-1), n=12-st; let ws=0; for(let i=0;i<n;i++) ws+=(i+1);
+  for(let i=0;i<n;i++) novos[st+i]=P.novos*(i+1)/ws;
+  const rec=tot.map((v,i)=>v+novos[i]);
+  const ded=rec.map(v=>v*P.ded/100), cus=rec.map(v=>v*P.custo/100), fix=rec.map(()=>fixBase*(1+P.fixInfl/100)+P.fixExtra);
+  const eb=rec.map((v,i)=>v-ded[i]-cus[i]-fix[i]);
+  const fin=rec.map(()=>P.fin), dist=rec.map(()=>-P.dist), inv=rec.map(()=>-P.inv), parc=rec.map(()=>-P.parc);
+  const liq=eb.map((v,i)=>v+fin[i]+dist[i]);
+  const apos=liq.map((v,i)=>v+inv[i]+parc[i]);
+  const S=a=>a.reduce((x,y)=>x+y,0);
+  const F=S(fix), d=P.ded/100, c=P.custo/100;
+  return {rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
+    R:S(rec),E:S(eb),Fx:F,be:F/(1-d-c),alvo:(1-d-c-P.metaMg/100)>0?F/(1-d-c-P.metaMg/100):null,liqS:S(liq),aposS:S(apos),novosS:S(novos)};
+}
+function bars(a,b,w,h){
+  const max=Math.max(...a,...b,1), mn=Math.min(0,...b), rng=max-mn, bw=w/12, y=v=>h-12-(v-mn)/rng*(h-24);
+  let s=`<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Receita e EBITDA mensal">`;
+  s+=`<line x1="0" x2="${w}" y1="${y(0)}" y2="${y(0)}" stroke="var(--border)"/>`;
+  for(let i=0;i<12;i++){
+    const x=i*bw+bw*0.12, ww=bw*0.35;
+    s+=`<rect x="${x}" y="${Math.min(y(a[i]),y(0))}" width="${ww}" height="${Math.abs(y(a[i])-y(0))}" fill="var(--accent)" opacity=".85"><title>${MN[i]}: receita ${R$(a[i])}</title></rect>`;
+    s+=`<rect x="${x+ww+2}" y="${Math.min(y(b[i]),y(0))}" width="${ww}" height="${Math.abs(y(b[i])-y(0))}" fill="${b[i]>=0?'var(--primary)':'var(--bad)'}"><title>${MN[i]}: EBITDA ${R$(b[i])}</title></rect>`;
+    s+=`<text x="${i*bw+bw/2}" y="${h-1}" text-anchor="middle">${MN[i]}</text>`;
+  }
+  const r26=OB.m2026.rec; let d='';
+  for(let i=0;i<9;i++) d+=(i?'L':'M')+(i*bw+bw/2)+' '+y(r26[i]);
+  s+=`<path d="${d}" fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  return s+'</svg>';
+}
+function render(){
+  const M=calc(), a25=OB.anual['2025'], a26=OB.anual['2026ytd'];
+  const r26a=a26[0]/10*12; // 2026 anualizado (ritmo médio mensal jan–out parcial)
+  const r26b=OB.m2026.rec.slice(0,9).reduce((x,y)=>x+y,0)/9*12;
+  const dv=(v,ref)=>{const x=(v/ref-1);return `<span class="${x>=0?'pos':'neg'}">${x>=0?'+':''}${(x*100).toFixed(1).replace('.',',')}%</span>`};
+  const mg=M.E/M.R;
+  document.getElementById('orcCards').innerHTML=[
+    [mi(M.R),'Meta de faturamento 2027',`vs 2025 ${dv(M.R,a25[0])} · vs 2026 anualizado ${dv(M.R,r26b)}`],
+    [mi(M.R/12),'Meta média mensal',`novos contratos: ${mi(M.novosS)}`],
+    [mi(M.E),'EBITDA 2027',`margem <span class="${mg>=P.metaMg/100?'pos':'neg'}">${pc(mg)}</span> (meta ${P.metaMg.toFixed(1).replace('.',',')}%)`],
+    [mi(M.liqS),'Resultado líquido',`após investimentos e parcelamentos: ${mi(M.aposS)}`],
+    [mi(M.be),'Faturamento de equilíbrio',`EBITDA zero · fixas ${mi(M.Fx)}/ano`],
+    [M.alvo?mi(M.alvo):'—','Faturamento p/ meta de margem',M.alvo?`faltam ${mi(Math.max(0,M.alvo-M.R))} para a meta`:'meta inviável com estes custos']
+  ].map(c=>`<div class="card"><div class="n">${c[0]}</div><div class="l">${c[1]}</div><div class="d">${c[2]}</div></div>`).join('');
+  document.getElementById('orcChart').innerHTML=bars(M.rec,M.eb,720,220);
+  document.getElementById('orcLegend').innerHTML='<span style="color:var(--accent)">■</span> receita bruta 2027 &nbsp; <span style="color:var(--primary)">■</span> EBITDA 2027 &nbsp; <span style="color:var(--warn)">- - -</span> receita real 2026 (jan–set)';
+  const lines=[['Receita operacional bruta',M.rec,1],['(-) Deduções',M.ded.map(v=>-v)],['(-) Custos dos serviços',M.cus.map(v=>-v)],['(-) Despesas fixas',M.fix.map(v=>-v)],['EBITDA',M.eb,1],['(+/-) Resultado financeiro',M.fin],['(-) Distribuição de lucros',M.dist],['Resultado líquido',M.liq,1],['(-) Investimentos',M.inv],['(-) Parcelamentos',M.parc],['Resultado após invest. e parcel.',M.apos,1]];
+  let h='<tr><th>R$ mil</th>'+MN.map(m=>`<th>${m}</th>`).join('')+'<th>2027</th></tr>';
+  lines.forEach(([n,a,b])=>{const t=a.reduce((x,y)=>x+y,0);h+=`<tr class="${b?'sub':''}"><td>${n}</td>`+a.map(v=>`<td class="${v<0&&b?'neg':''}">${k(v)}</td>`).join('')+`<td>${k(t)}</td></tr>`;});
+  document.getElementById('orcDre').innerHTML=h;
+  const rows=M.rows.slice().sort((x,y)=>y.sum-x.sum);
+  let t='<tr><th>Contrato</th><th>Tipo</th><th>Ritmo 2026 /mês</th><th>Saldo a faturar</th><th>Meses cobertos</th><th>Receita 2027</th><th>Δ vs 2026</th><th>Meta mensal (R$)</th></tr>';
+  rows.forEach(r=>{const c=r.c, med=r.sum/12, d=r.run*12?(r.sum/(r.run*12)-1):0;
+    t+=`<tr><td><span class="tag">${c.c}</span>${c.n}</td><td>${c.t==='S'?'Superv.':'Estudos'}</td><td>${R$(r.run)}</td><td class="${c.sd<0?'neg':''}">${c.sd?R$(c.sd):'—'}</td><td>${r.cov.toFixed(1).replace('.',',')}</td><td>${R$(r.sum)}</td><td class="${d>=0?'pos':'neg'}">${(d*100).toFixed(0)}%</td><td><input class="mini ${r.ov?'ovr':''}" data-c="${c.c}" inputmode="numeric" placeholder="${Math.round(med)}" value="${r.ov?Math.round(OVR[c.c]):''}"></td></tr>`;});
+  t+=`<tr class="sub"><td>Carteira atual (contratos ativos)</td><td></td><td>${R$(rows.reduce((s,r)=>s+r.run,0))}</td><td></td><td></td><td>${R$(M.tot.reduce((a,b)=>a+b,0))}</td><td></td><td></td></tr>`;
+  t+=`<tr class="sub"><td>Novos contratos (meta comercial)</td><td></td><td></td><td></td><td></td><td>${R$(M.novosS)}</td><td></td><td></td></tr>`;
+  document.getElementById('orcCt').innerHTML=t;
+  document.querySelectorAll('#orcCt .mini').forEach(i=>i.onchange=()=>{const v=i.value.replace(/\./g,'').replace(',','.').trim(); if(v===''||isNaN(+v)) delete OVR[i.dataset.c]; else OVR[i.dataset.c]=+v; save(); render();});
+  document.getElementById('orcFonte').innerHTML='Fonte: '+OB.fonte+'. Ritmo 2026 = receita jan–out ÷ meses com faturamento (Supervisão) ou ÷ 9,3 meses decorridos (Estudos e Projetos, que fatura de forma irregular). Contratos concluídos não entram. Simulação de planejamento, não é compromisso financeiro.';
+  window.__ORC=M;
+}
+function mkCtl(){
+  const el=document.getElementById('orcCtl'); let h='<h3>Premissas</h3>';
+  CTL.forEach(([key,l,mn,mx,st,f])=>{h+=`<div class="ctl"><div class="row"><span>${l}</span><b id="v_${key}"></b></div><input type="range" id="r_${key}" min="${mn}" max="${mx}" step="${st}"></div>`;});
+  el.innerHTML=h;
+  CTL.forEach(([key,l,mn,mx,st,f])=>{const r=document.getElementById('r_'+key); r.value=P[key]; document.getElementById('v_'+key).textContent=f(+P[key]);
+    r.oninput=()=>{P[key]=+r.value; document.getElementById('v_'+key).textContent=f(+r.value); SCN='custom'; markScen(); save(); render();};});
+}
+function setCtl(){CTL.forEach(([key,l,mn,mx,st,f])=>{const r=document.getElementById('r_'+key); r.value=P[key]; document.getElementById('v_'+key).textContent=f(+P[key]);});}
+function markScen(){document.querySelectorAll('#orcScen .btn[data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s===SCN));}
+document.getElementById('orcScen').innerHTML='<button class="btn" data-s="cons">Conservador</button><button class="btn" data-s="base">Base</button><button class="btn" data-s="otim">Otimista</button>';
+document.querySelectorAll('#orcScen .btn').forEach(b=>b.onclick=()=>{SCN=b.dataset.s;P=Object.assign({},SC[SCN]);setCtl();markScen();save();render();});
+document.getElementById('orcClr').onclick=()=>{OVR={};save();render();};
+document.getElementById('orcCsv').onclick=()=>{
+  const M=window.__ORC; let s='Contrato;Nome;Tipo;Ritmo2026_mes;Saldo_a_faturar;Meses_cobertos;Receita2027;Meta_mensal\n';
+  M.rows.forEach(r=>{s+=[r.c.c,r.c.n,r.c.t,Math.round(r.run),r.c.sd,r.cov.toFixed(1),Math.round(r.sum),Math.round(r.sum/12)].join(';')+'\n';});
+  s+='\nMes;Receita;EBITDA\n'; M.rec.forEach((v,i)=>{s+=[MN[i]+'/27',Math.round(v),Math.round(M.eb[i])].join(';')+'\n';});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+s],{type:'text/csv'})); a.download='orcamento_2027_engeplus.csv'; a.click();
+};
+mkCtl(); markScen(); render();
+})();
+</script>
+
 
   <section id="linha-do-tempo">
     <div class="section-head"><h2>Linha do Tempo de Execução</h2><span class="hint">ordenado por data de término</span></div>
