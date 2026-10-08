@@ -298,6 +298,13 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
 #orcamento .ctl .row b{color:var(--accent); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap;}
 #orcamento input[type=range]{width:100%; accent-color:var(--accent);}
 #orcamento .scen{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;}
+#orcamento .bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
+#orcamento .bar .sep{width:1px; height:22px; background:var(--border); margin:0 6px;}
+#orcamento .bar .qlbl{font-size:12.5px; color:var(--text-muted);}
+#orcamento .qin{width:92px; background:var(--surface-alt); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px; font:inherit; font-size:12.5px; text-align:right;}
+#orcamento .qin.man{border-color:var(--warn); background:var(--warn-soft);}
+#orcamento .qinfo{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 14px; margin-bottom:14px; font-size:12.5px; line-height:1.6;}
+#orcamento .qinfo table{width:100%;}
 #orcamento .btn{background:var(--surface-raised); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 11px; font:inherit; font-size:12.5px; cursor:pointer;}
 #orcamento .btn:hover{border-color:var(--accent);}
 #orcamento .btn.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
@@ -322,7 +329,8 @@ td.contrato{white-space:normal; min-width:230px; max-width:300px;}
 </style>
 <section id="orcamento">
   <div class="section-head"><h2>Orçamento 2027</h2><span class="hint">simulador interativo · base: DRE e contratos do ERP · mexa nos controles e veja o resultado na hora</span></div>
-  <div class="scen" id="orcScen"></div>
+  <div class="bar"><div class="scen" id="orcScen" style="margin:0"></div><span class="sep"></span><span class="qlbl">Simular trimestres (% da meta):</span><span id="orcQin" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center"></span></div>
+  <div class="qinfo" id="orcQ" style="display:none"></div>
   <div class="cards" id="orcCards"></div>
   <div class="orc-grid">
     <div class="panel" id="orcCtl"><h3>Premissas</h3></div>
@@ -365,9 +373,9 @@ const CTL=[
  ['dist','Distribuição de lucros (R$/mês)',0,300000,5000,v=>'R$ '+Math.round(v/1000)+' mil'],
  ['metaMg','Meta de margem EBITDA',0,25,0.5,v=>v.toFixed(1)+'%']
 ];
-let P=Object.assign({},DEF), OVR={}, SCN='base';
-try{const s=JSON.parse(localStorage.getItem('orc2027')||'null'); if(s){P=Object.assign(P,s.P||{}); OVR=s.OVR||{}; SCN=s.SCN||'base';}}catch(e){}
-function save(){try{localStorage.setItem('orc2027',JSON.stringify({P,OVR,SCN}));}catch(e){}}
+let P=Object.assign({},DEF), OVR={}, SCN='base', QT=[null,null,null,null];
+try{const s=JSON.parse(localStorage.getItem('orc2027')||'null'); if(s){P=Object.assign(P,s.P||{}); OVR=s.OVR||{}; SCN=s.SCN||'base'; QT=s.QT||QT;}}catch(e){}
+function save(){try{localStorage.setItem('orc2027',JSON.stringify({P,OVR,SCN,QT}));}catch(e){}}
 const R$=v=>(v<0?'-':'')+'R$ '+Math.abs(Math.round(v)).toLocaleString('pt-BR');
 const mi=v=>(v<0?'-':'')+'R$ '+(Math.abs(v)/1e6).toFixed(1).replace('.',',')+' mi';
 const k=v=>Math.round(v/1000).toLocaleString('pt-BR');
@@ -386,7 +394,16 @@ function calc(){
   });
   const st=Math.max(0,P.novIni-1), n=12-st; let ws=0; for(let i=0;i<n;i++) ws+=(i+1);
   for(let i=0;i<n;i++) novos[st+i]=P.novos*(i+1)/ws;
-  const rec=tot.map((v,i)=>v+novos[i]);
+  const recMeta=tot.map((v,i)=>v+novos[i]);
+  const qm=[0,1,2,3].map(q=>recMeta.slice(q*3,q*3+3).reduce((a,b)=>a+b,0));
+  const man=QT.map(v=>v!=null&&v!=='');
+  const metaTot=qm.reduce((a,b)=>a+b,0);
+  const manSum=qm.reduce((a,v,q)=>a+(man[q]?v*(1+QT[q]/100):0),0);
+  const freeBase=qm.reduce((a,v,q)=>a+(man[q]?0:v),0);
+  let ff=freeBase>0?(metaTot-manSum)/freeBase:1; const ffRaw=ff; if(ff<0) ff=0;
+  const fq=[0,1,2,3].map(q=>man[q]?(1+QT[q]/100):ff);
+  const anyMan=man.some(x=>x);
+  const rec=recMeta.map((v,i)=>v*(anyMan?fq[Math.floor(i/3)]:1));
   const ded=rec.map(v=>v*P.ded/100), cus=rec.map(v=>v*P.custo/100), fix=rec.map(()=>fixBase*(1+P.fixInfl/100)+P.fixExtra);
   const eb=rec.map((v,i)=>v-ded[i]-cus[i]-fix[i]);
   const fin=rec.map(()=>P.fin), dist=rec.map(()=>-P.dist), inv=rec.map(()=>-P.inv), parc=rec.map(()=>-P.parc);
@@ -394,7 +411,7 @@ function calc(){
   const apos=liq.map((v,i)=>v+inv[i]+parc[i]);
   const S=a=>a.reduce((x,y)=>x+y,0);
   const F=S(fix), d=P.ded/100, c=P.custo/100;
-  return {rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
+  return {recMeta,qm,man,fq,ffRaw,anyMan,metaTot,rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
     R:S(rec),E:S(eb),Fx:F,be:F/(1-d-c),alvo:(1-d-c-P.metaMg/100)>0?F/(1-d-c-P.metaMg/100):null,liqS:S(liq),aposS:S(apos),novosS:S(novos)};
 }
 function bars(a,b,w,h){
@@ -419,13 +436,15 @@ function render(){
   const dv=(v,ref)=>{const x=(v/ref-1);return `<span class="${x>=0?'pos':'neg'}">${x>=0?'+':''}${(x*100).toFixed(1).replace('.',',')}%</span>`};
   const mg=M.E/M.R;
   document.getElementById('orcCards').innerHTML=[
-    [mi(M.R),'Meta de faturamento 2027',`vs 2025 ${dv(M.R,a25[0])} · vs 2026 anualizado ${dv(M.R,r26b)}`],
-    [mi(M.R/12),'Meta média mensal',`novos contratos: ${mi(M.novosS)}`],
+    [mi(M.metaTot),'Meta de faturamento 2027',`vs 2025 ${dv(M.metaTot,a25[0])} · vs 2026 anualizado ${dv(M.metaTot,r26b)}`],
+    ...(M.anyMan?[[mi(M.R),'Faturamento simulado',`<span class="${M.R>=M.metaTot-1?'pos':'neg'}">${M.R>=M.metaTot-1?'bate':'faltam '+mi(M.metaTot-M.R)}</span> · ${dv(M.R,M.metaTot)} vs meta`]]:[]),
+    [mi(M.metaTot/12),'Meta média mensal',`novos contratos: ${mi(M.novosS)}`],
     [mi(M.E),'EBITDA 2027',`margem <span class="${mg>=P.metaMg/100?'pos':'neg'}">${pc(mg)}</span> (meta ${P.metaMg.toFixed(1).replace('.',',')}%)`],
     [mi(M.liqS),'Resultado líquido',`após investimentos e parcelamentos: ${mi(M.aposS)}`],
     [mi(M.be),'Faturamento de equilíbrio',`EBITDA zero · fixas ${mi(M.Fx)}/ano`],
     [M.alvo?mi(M.alvo):'—','Faturamento p/ meta de margem',M.alvo?`faltam ${mi(Math.max(0,M.alvo-M.R))} para a meta`:'meta inviável com estes custos']
   ].map(c=>`<div class="card"><div class="n">${c[0]}</div><div class="l">${c[1]}</div><div class="d">${c[2]}</div></div>`).join('');
+  renderQ(M);
   document.getElementById('orcChart').innerHTML=bars(M.rec,M.eb,720,220);
   document.getElementById('orcLegend').innerHTML='<span style="color:var(--accent)">■</span> receita bruta 2027 &nbsp; <span style="color:var(--primary)">■</span> EBITDA 2027 &nbsp; <span style="color:var(--warn)">- - -</span> receita real 2026 (jan–set)';
   const lines=[['Receita operacional bruta',M.rec,1],['(-) Deduções',M.ded.map(v=>-v)],['(-) Custos dos serviços',M.cus.map(v=>-v)],['(-) Despesas fixas',M.fix.map(v=>-v)],['EBITDA',M.eb,1],['(+/-) Resultado financeiro',M.fin],['(-) Distribuição de lucros',M.dist],['Resultado líquido',M.liq,1],['(-) Investimentos',M.inv],['(-) Parcelamentos',M.parc],['Resultado após invest. e parcel.',M.apos,1]];
@@ -442,6 +461,35 @@ function render(){
   document.querySelectorAll('#orcCt .mini').forEach(i=>i.onchange=()=>{const v=i.value.replace(/\./g,'').replace(',','.').trim(); if(v===''||isNaN(+v)) delete OVR[i.dataset.c]; else OVR[i.dataset.c]=+v; save(); render();});
   document.getElementById('orcFonte').innerHTML='Fonte: '+OB.fonte+'. Ritmo 2026 = receita jan–out ÷ meses com faturamento (Supervisão) ou ÷ 9,3 meses decorridos (Estudos e Projetos, que fatura de forma irregular). Contratos concluídos não entram. Simulação de planejamento, não é compromisso financeiro.';
   window.__ORC=M;
+}
+function renderQ(M){
+  const el=document.getElementById('orcQ');
+  document.querySelectorAll('#orcQin .qin').forEach((i,q)=>{
+    i.classList.toggle('man',M.man[q]);
+    i.placeholder=M.man[q]?'':((M.fq[q]-1)*100>=0?'+':'')+((M.fq[q]-1)*100).toFixed(1).replace('.',',')+'%';
+  });
+  if(!M.anyMan){el.style.display='none';return;}
+  el.style.display='block';
+  const sg=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+'%';
+  let h='<table><tr><th style="text-align:left">Trimestre</th><th>Meta</th><th>% da meta</th><th>Simulado</th><th>EBITDA</th></tr>';
+  for(let q=0;q<4;q++){
+    const rec=M.rec.slice(q*3,q*3+3).reduce((a,b)=>a+b,0), eb=M.eb.slice(q*3,q*3+3).reduce((a,b)=>a+b,0), pct=(M.fq[q]-1)*100;
+    h+=`<tr><td style="text-align:left"><b>T${q+1}</b> ${M.man[q]?'<span class="tag">manual</span>':'<span class="tag" style="background:var(--accent-soft);color:var(--accent)">automático</span>'}</td><td>${mi(M.qm[q])}</td><td class="${pct>=0?'pos':'neg'}">${sg(pct)}</td><td>${mi(rec)}</td><td class="${eb>=0?'pos':'neg'}">${mi(eb)}</td></tr>`;
+  }
+  h+='</table>';
+  const nFree=M.man.filter(x=>!x).length;
+  if(nFree===0) h+=`<div class="note">Os 4 trimestres estão em manual: o ano fecha em ${mi(M.R)} (${M.R>=M.metaTot-1?'meta batida':'faltam '+mi(M.metaTot-M.R)+' para a meta'}).</div>`;
+  else if(M.ffRaw<0) h+=`<div class="note neg">Os trimestres manuais já passam da meta anual (${mi(M.metaTot)}); os trimestres automáticos ficaram em 0%.</div>`;
+  else h+=`<div class="note">Para fechar o ano na meta de ${mi(M.metaTot)}, ${nFree===1?'o trimestre restante precisa':'os '+nFree+' trimestres restantes precisam'} faturar <b class="${M.ffRaw>=1?'pos':'neg'}">${sg((M.ffRaw-1)*100)}</b> em relação ao planejado${M.ffRaw>1.5?' — esforço muito acima do normal':''}.</div>`;
+  el.innerHTML=h;
+}
+function mkQ(){
+  const el=document.getElementById('orcQin'); let h='';
+  for(let q=0;q<4;q++) h+=`<label style="font-size:12px;color:var(--text-muted)">T${q+1} <input class="qin" data-q="${q}" inputmode="decimal" value="${QT[q]!=null&&QT[q]!==''?String(QT[q]).replace('.',','):''}" aria-label="Trimestre ${q+1}: % da meta (ex.: -30)"></label>`;
+  h+='<button class="btn" id="orcQclr">Limpar</button>';
+  el.innerHTML=h;
+  el.querySelectorAll('.qin').forEach(i=>i.onchange=()=>{const v=i.value.replace('%','').replace(',','.').trim(); QT[+i.dataset.q]=(v===''||isNaN(+v))?null:+v; save(); render();});
+  document.getElementById('orcQclr').onclick=()=>{QT=[null,null,null,null];el.querySelectorAll('.qin').forEach(i=>i.value='');save();render();};
 }
 function mkCtl(){
   const el=document.getElementById('orcCtl'); let h='<h3>Premissas</h3>';
@@ -461,7 +509,7 @@ document.getElementById('orcCsv').onclick=()=>{
   s+='\nMes;Receita;EBITDA\n'; M.rec.forEach((v,i)=>{s+=[MN[i]+'/27',Math.round(v),Math.round(M.eb[i])].join(';')+'\n';});
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+s],{type:'text/csv'})); a.download='orcamento_2027_engeplus.csv'; a.click();
 };
-mkCtl(); markScen(); render();
+mkCtl(); mkQ(); markScen(); render();
 })();
 </script>
 
