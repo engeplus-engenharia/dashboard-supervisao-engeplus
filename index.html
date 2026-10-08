@@ -414,14 +414,19 @@ function calc(){
   return {recMeta,qm,man,fq,ffRaw,anyMan,metaTot,rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
     R:S(rec),E:S(eb),Fx:F,be:F/(1-d-c),alvo:(1-d-c-P.metaMg/100)>0?F/(1-d-c-P.metaMg/100):null,liqS:S(liq),aposS:S(apos),novosS:S(novos)};
 }
-function bars(a,b,w,h){
-  const max=Math.max(...a,...b,1), mn=Math.min(0,...b), rng=max-mn, bw=w/12, y=v=>h-12-(v-mn)/rng*(h-24);
+function bars(a,b,w,h,meta,ql){
+  const max=Math.max(...a,...b,...(meta||[]),1), mn=Math.min(0,...b), rng=max-mn, bw=w/12, y=v=>h-12-(v-mn)/rng*(h-24);
   let s=`<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Receita e EBITDA mensal">`;
+  if(ql) for(let q=0;q<4;q++){
+    s+=`<rect x="${q*3*bw}" y="0" width="${3*bw}" height="${h-12}" fill="${q%2?'transparent':'var(--surface-alt)'}" opacity=".7"/>`;
+    s+=`<text x="${q*3*bw+3*bw/2}" y="11" text-anchor="middle" style="fill:${ql[q].c};font-size:11px;font-weight:600">${ql[q].t}</text>`;
+  }
   s+=`<line x1="0" x2="${w}" y1="${y(0)}" y2="${y(0)}" stroke="var(--border)"/>`;
   for(let i=0;i<12;i++){
     const x=i*bw+bw*0.12, ww=bw*0.35;
     s+=`<rect x="${x}" y="${Math.min(y(a[i]),y(0))}" width="${ww}" height="${Math.abs(y(a[i])-y(0))}" fill="var(--accent)" opacity=".85"><title>${MN[i]}: receita ${R$(a[i])}</title></rect>`;
     s+=`<rect x="${x+ww+2}" y="${Math.min(y(b[i]),y(0))}" width="${ww}" height="${Math.abs(y(b[i])-y(0))}" fill="${b[i]>=0?'var(--primary)':'var(--bad)'}"><title>${MN[i]}: EBITDA ${R$(b[i])}</title></rect>`;
+    if(meta) s+=`<rect x="${x}" y="${y(meta[i])}" width="${ww}" height="${Math.max(0,y(0)-y(meta[i]))}" fill="none" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 2"><title>${MN[i]}: meta ${R$(meta[i])}</title></rect>`;
     s+=`<text x="${i*bw+bw/2}" y="${h-1}" text-anchor="middle">${MN[i]}</text>`;
   }
   const r26=OB.m2026.rec; let d='';
@@ -445,8 +450,9 @@ function render(){
     [M.alvo?mi(M.alvo):'—','Faturamento p/ meta de margem',M.alvo?`faltam ${mi(Math.max(0,M.alvo-M.R))} para a meta`:'meta inviável com estes custos']
   ].map(c=>`<div class="card"><div class="n">${c[0]}</div><div class="l">${c[1]}</div><div class="d">${c[2]}</div></div>`).join('');
   renderQ(M);
-  document.getElementById('orcChart').innerHTML=bars(M.rec,M.eb,720,220);
-  document.getElementById('orcLegend').innerHTML='<span style="color:var(--accent)">■</span> receita bruta 2027 &nbsp; <span style="color:var(--primary)">■</span> EBITDA 2027 &nbsp; <span style="color:var(--warn)">- - -</span> receita real 2026 (jan–set)';
+  const ql=[0,1,2,3].map(q=>{const p=(M.fq[q]-1)*100;return {t:'T'+(q+1)+(M.anyMan?' '+(p>=0?'+':'')+p.toFixed(0)+'%'+(M.man[q]?' ✎':' auto'):''),c:!M.anyMan?'var(--text-muted)':(p>=0?'var(--ok)':'var(--bad)')};});
+  document.getElementById('orcChart').innerHTML=bars(M.rec,M.eb,720,240,M.anyMan?M.recMeta:null,ql);
+  document.getElementById('orcLegend').innerHTML='<span style="color:var(--accent)">■</span> receita bruta 2027 &nbsp; <span style="color:var(--primary)">■</span> EBITDA 2027 &nbsp; <span style="color:var(--warn)">- - -</span> receita real 2026 (jan–set)'+(M.anyMan?' &nbsp; <span style="color:var(--text-muted)">▭</span> meta original (tracejado) &nbsp; ✎ = trimestre digitado por você · auto = ajustado para fechar a meta':'');
   const lines=[['Receita operacional bruta',M.rec,1],['(-) Deduções',M.ded.map(v=>-v)],['(-) Custos dos serviços',M.cus.map(v=>-v)],['(-) Despesas fixas',M.fix.map(v=>-v)],['EBITDA',M.eb,1],['(+/-) Resultado financeiro',M.fin],['(-) Distribuição de lucros',M.dist],['Resultado líquido',M.liq,1],['(-) Investimentos',M.inv],['(-) Parcelamentos',M.parc],['Resultado após invest. e parcel.',M.apos,1]];
   let h='<tr><th>R$ mil</th>'+MN.map(m=>`<th>${m}</th>`).join('')+'<th>2027</th></tr>';
   lines.forEach(([n,a,b])=>{const t=a.reduce((x,y)=>x+y,0);h+=`<tr class="${b?'sub':''}"><td>${n}</td>`+a.map(v=>`<td class="${v<0&&b?'neg':''}">${k(v)}</td>`).join('')+`<td>${k(t)}</td></tr>`;});
