@@ -390,7 +390,7 @@ function calc(){
     for(let m=0;m<12;m++){ let w; if(cov>=12) w=1; else if(m<fl) w=1; else if(m===fl) w=f+(1-f)*p; else w=p; arr.push(run*g*w); }
     const ov=OVR[c.c]; const fin=(ov!=null&&ov!=='')?Array(12).fill(+ov):arr;
     const sum=fin.reduce((a,b)=>a+b,0); fin.forEach((v,i)=>tot[i]+=v);
-    rows.push({c,run,cov,sum,ov:(ov!=null&&ov!==''),p});
+    rows.push({c,run,cov,sum,arr:fin,ov:(ov!=null&&ov!==''),p});
   });
   const st=Math.max(0,P.novIni-1), n=12-st; let ws=0; for(let i=0;i<n;i++) ws+=(i+1);
   for(let i=0;i<n;i++) novos[st+i]=P.novos*(i+1)/ws;
@@ -404,6 +404,8 @@ function calc(){
   const fq=[0,1,2,3].map(q=>man[q]?(1+QT[q]/100):ff);
   const anyMan=man.some(x=>x);
   const rec=recMeta.map((v,i)=>v*(anyMan?fq[Math.floor(i/3)]:1));
+  rows.forEach(r=>{r.sim=r.arr.reduce((a,v,i)=>a+v*(anyMan?fq[Math.floor(i/3)]:1),0);});
+  const novosSim=novos.reduce((a,v,i)=>a+v*(anyMan?fq[Math.floor(i/3)]:1),0), carSim=tot.reduce((a,v,i)=>a+v*(anyMan?fq[Math.floor(i/3)]:1),0);
   const ded=rec.map(v=>v*P.ded/100), cus=rec.map(v=>v*P.custo/100), fix=rec.map(()=>fixBase*(1+P.fixInfl/100)+P.fixExtra);
   const eb=rec.map((v,i)=>v-ded[i]-cus[i]-fix[i]);
   const fin=rec.map(()=>P.fin), dist=rec.map(()=>-P.dist), inv=rec.map(()=>-P.inv), parc=rec.map(()=>-P.parc);
@@ -411,7 +413,7 @@ function calc(){
   const apos=liq.map((v,i)=>v+inv[i]+parc[i]);
   const S=a=>a.reduce((x,y)=>x+y,0);
   const F=S(fix), d=P.ded/100, c=P.custo/100;
-  return {recMeta,qm,man,fq,ffRaw,anyMan,metaTot,rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
+  return {novosSim,carSim,recMeta,qm,man,fq,ffRaw,anyMan,metaTot,rows,rec,ded,cus,fix,eb,fin,dist,inv,parc,liq,apos,novos,tot,
     R:S(rec),E:S(eb),Fx:F,be:F/(1-d-c),alvo:(1-d-c-P.metaMg/100)>0?F/(1-d-c-P.metaMg/100):null,liqS:S(liq),aposS:S(apos),novosS:S(novos)};
 }
 function bars(a,b,w,h,meta,ql){
@@ -458,11 +460,11 @@ function render(){
   lines.forEach(([n,a,b])=>{const t=a.reduce((x,y)=>x+y,0);h+=`<tr class="${b?'sub':''}"><td>${n}</td>`+a.map(v=>`<td class="${v<0&&b?'neg':''}">${k(v)}</td>`).join('')+`<td>${k(t)}</td></tr>`;});
   document.getElementById('orcDre').innerHTML=h;
   const rows=M.rows.slice().sort((x,y)=>y.sum-x.sum);
-  let t='<tr><th>Contrato</th><th>Tipo</th><th>Ritmo 2026 /mês</th><th>Saldo a faturar</th><th>Meses cobertos</th><th>Receita 2027</th><th>Δ vs 2026</th><th>Meta mensal (R$)</th></tr>';
+  let t='<tr><th>Contrato</th><th>Tipo</th><th>Ritmo 2026 /mês</th><th>Saldo a faturar</th><th>Meses cobertos</th><th>Meta 2027</th>'+(M.anyMan?'<th>Simulado 2027</th><th>% da meta</th>':'')+'<th>Δ vs 2026</th><th>Meta mensal (R$)</th></tr>';
   rows.forEach(r=>{const c=r.c, med=r.sum/12, d=r.run*12?(r.sum/(r.run*12)-1):0;
-    t+=`<tr><td><span class="tag">${c.c}</span>${c.n}</td><td>${c.t==='S'?'Superv.':'Estudos'}</td><td>${R$(r.run)}</td><td class="${c.sd<0?'neg':''}">${c.sd?R$(c.sd):'—'}</td><td>${r.cov.toFixed(1).replace('.',',')}</td><td>${R$(r.sum)}</td><td class="${d>=0?'pos':'neg'}">${(d*100).toFixed(0)}%</td><td><input class="mini ${r.ov?'ovr':''}" data-c="${c.c}" inputmode="numeric" placeholder="${Math.round(med)}" value="${r.ov?Math.round(OVR[c.c]):''}"></td></tr>`;});
-  t+=`<tr class="sub"><td>Carteira atual (contratos ativos)</td><td></td><td>${R$(rows.reduce((s,r)=>s+r.run,0))}</td><td></td><td></td><td>${R$(M.tot.reduce((a,b)=>a+b,0))}</td><td></td><td></td></tr>`;
-  t+=`<tr class="sub"><td>Novos contratos (meta comercial)</td><td></td><td></td><td></td><td></td><td>${R$(M.novosS)}</td><td></td><td></td></tr>`;
+    t+=`<tr><td><span class="tag">${c.c}</span>${c.n}</td><td>${c.t==='S'?'Superv.':'Estudos'}</td><td>${R$(r.run)}</td><td class="${c.sd<0?'neg':''}">${c.sd?R$(c.sd):'—'}</td><td>${r.cov.toFixed(1).replace('.',',')}</td><td>${R$(r.sum)}</td>${M.anyMan?`<td>${R$(r.sim)}</td><td class="${r.sim>=r.sum-1?'pos':'neg'}">${r.sum?((r.sim/r.sum-1)*100).toFixed(1).replace('.',',')+'%':'—'}</td>`:''}<td class="${d>=0?'pos':'neg'}">${(d*100).toFixed(0)}%</td><td><input class="mini ${r.ov?'ovr':''}" data-c="${c.c}" inputmode="numeric" placeholder="${Math.round(med)}" value="${r.ov?Math.round(OVR[c.c]):''}"></td></tr>`;});
+  t+=`<tr class="sub"><td>Carteira atual (contratos ativos)</td><td></td><td>${R$(rows.reduce((s,r)=>s+r.run,0))}</td><td></td><td></td><td>${R$(M.tot.reduce((a,b)=>a+b,0))}</td>${M.anyMan?`<td>${R$(M.carSim)}</td><td></td>`:''}<td></td><td></td></tr>`;
+  t+=`<tr class="sub"><td>Novos contratos (meta comercial)</td><td></td><td></td><td></td><td></td><td>${R$(M.novosS)}</td>${M.anyMan?`<td>${R$(M.novosSim)}</td><td></td>`:''}<td></td><td></td></tr>`;
   document.getElementById('orcCt').innerHTML=t;
   document.querySelectorAll('#orcCt .mini').forEach(i=>i.onchange=()=>{const v=i.value.replace(/\./g,'').replace(',','.').trim(); if(v===''||isNaN(+v)) delete OVR[i.dataset.c]; else OVR[i.dataset.c]=+v; save(); render();});
   document.getElementById('orcFonte').innerHTML='Fonte: '+OB.fonte+'. Ritmo 2026 = receita jan–out ÷ meses com faturamento (Supervisão) ou ÷ 9,3 meses decorridos (Estudos e Projetos, que fatura de forma irregular). Contratos concluídos não entram. Simulação de planejamento, não é compromisso financeiro.';
@@ -510,8 +512,8 @@ document.getElementById('orcScen').innerHTML='<button class="btn" data-s="cons">
 document.querySelectorAll('#orcScen .btn').forEach(b=>b.onclick=()=>{SCN=b.dataset.s;P=Object.assign({},SC[SCN]);setCtl();markScen();save();render();});
 document.getElementById('orcClr').onclick=()=>{OVR={};save();render();};
 document.getElementById('orcCsv').onclick=()=>{
-  const M=window.__ORC; let s='Contrato;Nome;Tipo;Ritmo2026_mes;Saldo_a_faturar;Meses_cobertos;Receita2027;Meta_mensal\n';
-  M.rows.forEach(r=>{s+=[r.c.c,r.c.n,r.c.t,Math.round(r.run),r.c.sd,r.cov.toFixed(1),Math.round(r.sum),Math.round(r.sum/12)].join(';')+'\n';});
+  const M=window.__ORC; let s='Contrato;Nome;Tipo;Ritmo2026_mes;Saldo_a_faturar;Meses_cobertos;Receita2027;Simulado2027;Meta_mensal\n';
+  M.rows.forEach(r=>{s+=[r.c.c,r.c.n,r.c.t,Math.round(r.run),r.c.sd,r.cov.toFixed(1),Math.round(r.sum),Math.round(r.sim),Math.round(r.sum/12)].join(';')+'\n';});
   s+='\nMes;Receita;EBITDA\n'; M.rec.forEach((v,i)=>{s+=[MN[i]+'/27',Math.round(v),Math.round(M.eb[i])].join(';')+'\n';});
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+s],{type:'text/csv'})); a.download='orcamento_2027_engeplus.csv'; a.click();
 };
